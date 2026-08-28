@@ -29,6 +29,9 @@ importers:
       constructs:
         specifier: ^10.8.1
         version: 10.8.1
+      electrodb:
+        specifier: ^3.9.3
+        version: 3.9.3(@aws-sdk/client-dynamodb@3.1120.0)
       openai:
         specifier: ^7.8.0
         version: 7.8.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.3)(zod@4.4.3)
@@ -780,6 +783,9 @@ packages:
     resolution: {integrity: sha512-X07nttJQkwkfKfvTPG/KSnE2OMdcUCao6+eXF3wmnIQRn2aPAHH3VxDbDOdegkd6JbPsXqShpvEOHfAT+nCNwQ==}
     engines: {node: '>=0.3.1'}
 
+  electrodb@3.9.3:
+    resolution: {integrity: sha512-7RGiQt1mXunlhswzLW3wEwXdlIv2x32FzifOoJfyHFiyIrvRoUmfe69xIpoiOysHN4N/RKdxFQ53FlFA2nPQDA==}
+
   es-module-lexer@2.3.2:
     resolution: {integrity: sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==}
 
@@ -927,6 +933,9 @@ packages:
 
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
+
+  jsonschema@1.5.0:
+    resolution: {integrity: sha512-K+A9hhqbn0f3pJX17Q/7H6yQfD/5OXgdrR5UE12gMXCiN9D5Xq2o5mddV2QEcX/bjla99ASsAAQUyMCCRWAEhw==}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -2013,6 +2022,14 @@ snapshots:
 
   diff@4.0.4: {}
 
+  electrodb@3.9.3(@aws-sdk/client-dynamodb@3.1120.0):
+    dependencies:
+      '@aws-sdk/lib-dynamodb': 3.1120.0(@aws-sdk/client-dynamodb@3.1120.0)
+      '@aws-sdk/util-dynamodb': 3.996.9(@aws-sdk/client-dynamodb@3.1120.0)
+      jsonschema: 1.5.0
+    transitivePeerDependencies:
+      - '@aws-sdk/client-dynamodb'
+
   es-module-lexer@2.3.2: {}
 
   esbuild@0.28.2:
@@ -2176,6 +2193,8 @@ snapshots:
   json-schema-traverse@0.4.1: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
+
+  jsonschema@1.5.0: {}
 
   keyv@4.5.4:
     dependencies:

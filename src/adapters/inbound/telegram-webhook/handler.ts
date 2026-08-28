@@ -1,4 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { getConfig, getSecret } from '../../../shared/config/env';
 import { logger } from '../../../shared/logger';
 import { RegisterNewBatchUseCase } from '../../../application/use-cases/register-new-batch';
@@ -7,6 +9,7 @@ import { LogConsumptionUseCase } from '../../../application/use-cases/log-consum
 import { GetDailySummaryUseCase } from '../../../application/use-cases/get-daily-summary';
 import { OpenAiNutritionAnalyzer } from '../../outbound/ai/openai-nutrition-analyzer.adapter';
 import { CachedNutritionAnalyzer } from '../../outbound/ai/cached-nutrition-analyzer.decorator';
+import { createElectroEntities } from '../../outbound/persistence/dynamodb/electrodb-schema';
 import { DynamoBatchRepository } from '../../outbound/persistence/dynamodb/dynamo-batch-repository.adapter';
 import { DynamoUserRepository } from '../../outbound/persistence/dynamodb/dynamo-user-repository.adapter';
 import { DynamoLogRepository } from '../../outbound/persistence/dynamodb/dynamo-log-repository.adapter';
@@ -14,9 +17,22 @@ import { DynamoNutritionCacheRepository } from '../../outbound/persistence/dynam
 import { TelegramMessaging } from '../../outbound/messaging/telegram-messaging.adapter';
 import { parseTelegramUpdate } from './telegram-message-parser';
 
+// Módulo se reusa entre invocaciones "warm" del mismo contenedor Lambda: el
+// client de Dynamo y las entidades de ElectroDB se arman una sola vez por
+// cold start, no en cada request.
+const config = getConfig();
+const electro = createElectroEntities(
+  DynamoDBDocumentClient.from(new DynamoDBClient({})),
+  config.tableName,
+);
+const batches = new DynamoBatchRepository(electro.entities.batch);
+const users = new DynamoUserRepository(electro.entities.userProfile);
+const logs = new DynamoLogRepository(electro.entities.consumptionLog);
+const nutritionCache = new DynamoNutritionCacheRepository(electro.entities.nutritionCache);
+
 const HELP_TEXT = [
   'Comandos disponibles:',
-  '/registrar <nombre> | <descripción> — registra un batch nuevo (podés adjuntar foto)',
+  '/registrar <nombre> | <descripción> — registra un batch nuevo (puedes adjuntar foto)',
   '/porcion <batchId> — cuánto servirte hoy de ese batch',
   '/consumo <batchId> <gramos> — registra lo que te serviste',
   '/resumen — tus macros consumidos y restantes de hoy',
@@ -49,17 +65,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEv
     return { statusCode: 200, body: 'ok' };
   }
 
-  const config = getConfig();
   const botToken = await getSecret('TELEGRAM_TOKEN_PARAM_NAME');
   const openAiApiKey = await getSecret('OPENAI_API_KEY_PARAM_NAME');
 
   // Composition root manual: a esta escala (2 usuarios) un contenedor de DI
-  // sería puro overhead.
+  // sería puro overhead. Los repos de Dynamo se arman a nivel de módulo
+  // (arriba); acá solo lo que depende de un secreto async.
   const messaging = new TelegramMessaging(botToken);
-  const batches = DynamoBatchRepository.fromTableName(config.tableName);
-  const users = DynamoUserRepository.fromTableName(config.tableName);
-  const logs = DynamoLogRepository.fromTableName(config.tableName);
-  const nutritionCache = DynamoNutritionCacheRepository.fromTableName(config.tableName);
   const analyzer = new CachedNutritionAnalyzer(
     new OpenAiNutritionAnalyzer(openAiApiKey),
     nutritionCache,

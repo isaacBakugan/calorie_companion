@@ -43,8 +43,11 @@ export class DiscoveredLambdaFunction extends Construct {
       bundling: {
         minify: true,
         sourceMap: false,
-        // El SDK v3 ya viene en el runtime de Lambda: no lo empaquetamos.
-        externalModules: ['@aws-sdk/*'],
+        // No externalizamos @aws-sdk/*: ElectroDB trae su propia cadena de
+        // dependencias @aws-sdk (util-dynamodb, etc.) y no hay forma de
+        // confirmar que el runtime de Lambda incluya exactamente esos
+        // paquetes. A este volumen, unos KB extra de bundle no cuestan
+        // nada — depender de un supuesto no verificado sí tiene costo.
         tsconfig: path.join(__dirname, '../../../tsconfig.json'),
       },
       environment: {

@@ -96,7 +96,7 @@ calorie-companion/
 │   │       │   ├── dynamo-user-repository.adapter.ts
 │   │       │   ├── dynamo-log-repository.adapter.ts
 │   │       │   ├── dynamo-nutrition-cache-repository.adapter.ts   # cache del NutritionAnalyzerPort
-│   │       │   └── single-table-schema.ts
+│   │       │   └── electrodb-schema.ts       # ElectroDB: las 4 entidades del single-table
 │   │       ├── storage/s3-media-storage.adapter.ts
 │   │       └── messaging/telegram-messaging.adapter.ts
 │   │

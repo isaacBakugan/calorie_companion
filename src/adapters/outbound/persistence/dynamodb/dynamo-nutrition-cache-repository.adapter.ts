@@ -1,39 +1,18 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
-import type {
-  NutritionAnalysisCachePort,
-} from '../../../../application/ports/nutrition-analysis-cache.port';
+import type { NutritionAnalysisCachePort } from '../../../../application/ports/nutrition-analysis-cache.port';
 import type { NutritionAnalysisResult } from '../../../../application/ports/nutrition-analyzer.port';
-import { keys } from './single-table-schema';
+import type { ElectroService } from './electrodb-schema';
 
 export class DynamoNutritionCacheRepository implements NutritionAnalysisCachePort {
-  constructor(
-    private readonly doc: DynamoDBDocumentClient,
-    private readonly tableName: string,
-  ) {}
-
-  static fromTableName(tableName: string): DynamoNutritionCacheRepository {
-    return new DynamoNutritionCacheRepository(
-      DynamoDBDocumentClient.from(new DynamoDBClient({})),
-      tableName,
-    );
-  }
+  constructor(private readonly entity: ElectroService['entities']['nutritionCache']) {}
 
   async get(normalizedName: string): Promise<NutritionAnalysisResult | null> {
-    const result = await this.doc.send(
-      new GetCommand({ TableName: this.tableName, Key: keys.nutritionCache(normalizedName) }),
-    );
-    if (!result.Item) return null;
-    const { totalGrams, totalMacros } = result.Item as NutritionAnalysisResult;
+    const result = await this.entity.get({ normalizedName }).go();
+    if (!result.data) return null;
+    const { totalGrams, totalMacros } = result.data;
     return { totalGrams, totalMacros };
   }
 
   async set(normalizedName: string, result: NutritionAnalysisResult): Promise<void> {
-    await this.doc.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: { ...keys.nutritionCache(normalizedName), ...result },
-      }),
-    );
+    await this.entity.put({ normalizedName, ...result }).go();
   }
 }

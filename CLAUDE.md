@@ -99,8 +99,18 @@ sin redundancia entre `src/` e `infra/`:
 - Imports **absolutos** vía path aliases de `tsconfig.json`: `@domain/*`, `@application/*`,
   `@adapters/*`, `@shared/*`. Igual que en el resto de mis repos — nada de `../../../../`.
 - Bundling de Lambda con `aws-cdk-lib/aws-lambda-nodejs` (esbuild integrado, sin bundler aparte).
-  El SDK v3 se marca `external` (`@aws-sdk/*`) porque ya viene en el runtime de Lambda — no pagar
-  bundle size ni cold start por algo que AWS ya provee gratis.
+  El SDK v3 se empaqueta completo (no se marca `external`): ElectroDB trae su propia cadena de
+  paquetes `@aws-sdk/*` (`util-dynamodb`, etc.) y no hay forma de verificar que el runtime de
+  Lambda incluya exactamente esos paquetes. A este volumen, el bundle un poco más grande (~800kb)
+  no cuesta nada — apostar a un supuesto no verificado sobre el runtime sí tiene costo (una falla
+  en prod). Si en algún momento se audita qué trae realmente el runtime y se confirma, se puede
+  volver a externalizar.
+- **ElectroDB** sobre DynamoDB (`src/adapters/outbound/persistence/dynamodb/electrodb-schema.ts`):
+  4 entidades (`batch`, `userProfile`, `consumptionLog`, `nutritionCache`) agrupadas en un
+  `Service`, todas sobre la misma tabla single-table. Schema deliberadamente simple — sin
+  `collections` de ElectroDB todavía (se agregan cuando exista un patrón de acceso real que las
+  necesite). Los adapters de cada repo port reciben la entidad ElectroDB ya armada por
+  constructor — ElectroDB es un detalle de implementación del adapter, el puerto no lo conoce.
 - **vitest** para tests (no jest): nativo en TS/ESM, cero configuración de babel.
 - Un solo ambiente (no dev/stg/prod). Desvío consciente de mi estándar habitual de 3 ambientes
   en la misma cuenta — no se justifica la complejidad para un proyecto personal de 2 usuarios.
