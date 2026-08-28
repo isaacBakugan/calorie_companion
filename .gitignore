@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# CDK
+infra/cdk.out/
+infra/cdk.context.json
+*.d.ts
+!src/**/*.d.ts
+
+# Secrets locales — NUNCA subir esto (repo público)
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json

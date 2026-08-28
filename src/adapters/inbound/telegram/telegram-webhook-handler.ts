@@ -1,0 +1,144 @@
+import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import { getConfig, getSecret } from '../../../shared/config/env';
+import { logger } from '../../../shared/logger';
+import { RegisterNewBatchUseCase } from '../../../application/use-cases/register-new-batch';
+import { GetServingSuggestionUseCase } from '../../../application/use-cases/get-serving-suggestion';
+import { LogConsumptionUseCase } from '../../../application/use-cases/log-consumption';
+import { GetDailySummaryUseCase } from '../../../application/use-cases/get-daily-summary';
+import { OpenAiNutritionAnalyzer } from '../../outbound/ai/openai-nutrition-analyzer.adapter';
+import { CachedNutritionAnalyzer } from '../../outbound/ai/cached-nutrition-analyzer.decorator';
+import { DynamoBatchRepository } from '../../outbound/persistence/dynamodb/dynamo-batch-repository.adapter';
+import { DynamoUserRepository } from '../../outbound/persistence/dynamodb/dynamo-user-repository.adapter';
+import { DynamoLogRepository } from '../../outbound/persistence/dynamodb/dynamo-log-repository.adapter';
+import { DynamoNutritionCacheRepository } from '../../outbound/persistence/dynamodb/dynamo-nutrition-cache-repository.adapter';
+import { TelegramMessaging } from '../../outbound/messaging/telegram-messaging.adapter';
+import { parseTelegramUpdate } from './telegram-message-parser';
+
+const HELP_TEXT = [
+  'Comandos disponibles:',
+  '/registrar <nombre> | <descripción> — registra un batch nuevo (podés adjuntar foto)',
+  '/porcion <batchId> — cuánto servirte hoy de ese batch',
+  '/consumo <batchId> <gramos> — registra lo que te serviste',
+  '/resumen — tus macros consumidos y restantes de hoy',
+].join('\n');
+
+async function downloadTelegramPhotoAsBase64(botToken: string, fileId: string): Promise<string> {
+  const fileInfoResponse = await fetch(
+    `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`,
+  );
+  const fileInfo = (await fileInfoResponse.json()) as { result?: { file_path?: string } };
+  const filePath = fileInfo.result?.file_path;
+  if (!filePath) throw new Error('Telegram getFile no devolvió file_path');
+
+  const fileResponse = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+  const arrayBuffer = await fileResponse.arrayBuffer();
+  return Buffer.from(arrayBuffer).toString('base64');
+}
+
+export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEventV2) => {
+  const webhookSecret = await getSecret('TELEGRAM_WEBHOOK_SECRET_PARAM_NAME');
+  const receivedSecret = event.headers?.['x-telegram-bot-api-secret-token'];
+  if (receivedSecret !== webhookSecret) {
+    logger.warn('Webhook rechazado: secret token inválido');
+    return { statusCode: 401, body: 'unauthorized' };
+  }
+
+  const parsedMessage = parseTelegramUpdate(event.body ?? '{}');
+  if (!parsedMessage) {
+    // Update sin mensaje de texto/foto (p.ej. edición, reacción): se ignora sin error.
+    return { statusCode: 200, body: 'ok' };
+  }
+
+  const config = getConfig();
+  const botToken = await getSecret('TELEGRAM_TOKEN_PARAM_NAME');
+  const openAiApiKey = await getSecret('OPENAI_API_KEY_PARAM_NAME');
+
+  // Composition root manual: a esta escala (2 usuarios) un contenedor de DI
+  // sería puro overhead.
+  const messaging = new TelegramMessaging(botToken);
+  const batches = DynamoBatchRepository.fromTableName(config.tableName);
+  const users = DynamoUserRepository.fromTableName(config.tableName);
+  const logs = DynamoLogRepository.fromTableName(config.tableName);
+  const nutritionCache = DynamoNutritionCacheRepository.fromTableName(config.tableName);
+  const analyzer = new CachedNutritionAnalyzer(
+    new OpenAiNutritionAnalyzer(openAiApiKey),
+    nutritionCache,
+  );
+
+  const userId = parsedMessage.telegramUserId;
+  const [command, ...rest] = (parsedMessage.text ?? '').trim().split(/\s+/);
+  const argsText = rest.join(' ');
+
+  try {
+    switch (command) {
+      case '/registrar': {
+        const [name, description = ''] = argsText.split('|').map((part) => part.trim());
+        if (!name) {
+          await messaging.sendText(parsedMessage.chatId, 'Uso: /registrar <nombre> | <descripción>');
+          break;
+        }
+        const imageBase64 = parsedMessage.photoFileId
+          ? await downloadTelegramPhotoAsBase64(botToken, parsedMessage.photoFileId)
+          : undefined;
+        const batch = await new RegisterNewBatchUseCase(analyzer, batches).execute({
+          userId,
+          name,
+          description,
+          imageBase64,
+        });
+        await messaging.sendText(
+          parsedMessage.chatId,
+          `Batch registrado: ${batch.name} (id ${batch.id}), ${batch.totalGrams} g, ${Math.round(batch.totalMacros.kcal)} kcal total.`,
+        );
+        break;
+      }
+      case '/porcion': {
+        const [batchId] = rest;
+        if (!batchId) {
+          await messaging.sendText(parsedMessage.chatId, 'Uso: /porcion <batchId>');
+          break;
+        }
+        const serving = await new GetServingSuggestionUseCase(batches, users, logs).execute({
+          userId,
+          batchId,
+          todayIsoDate: new Date().toISOString().slice(0, 10),
+        });
+        await messaging.sendText(
+          parsedMessage.chatId,
+          `Serví ${Math.round(serving.grams)} g (${Math.round(serving.macros.kcal)} kcal).`,
+        );
+        break;
+      }
+      case '/consumo': {
+        const [batchId, gramsText] = rest;
+        const servedGrams = Number(gramsText);
+        if (!batchId || !Number.isFinite(servedGrams)) {
+          await messaging.sendText(parsedMessage.chatId, 'Uso: /consumo <batchId> <gramos>');
+          break;
+        }
+        await new LogConsumptionUseCase(batches, logs).execute({ userId, batchId, servedGrams });
+        await messaging.sendText(parsedMessage.chatId, 'Consumo registrado.');
+        break;
+      }
+      case '/resumen': {
+        const summary = await new GetDailySummaryUseCase(users, logs).execute(
+          userId,
+          new Date().toISOString().slice(0, 10),
+        );
+        await messaging.sendText(
+          parsedMessage.chatId,
+          `Hoy consumiste ${Math.round(summary.consumed.kcal)} kcal. Te quedan ${Math.round(summary.remaining.kcal)} kcal.`,
+        );
+        break;
+      }
+      default: {
+        await messaging.sendText(parsedMessage.chatId, HELP_TEXT);
+      }
+    }
+  } catch (error) {
+    logger.error('Error procesando update de Telegram', { error: String(error), userId });
+    await messaging.sendText(parsedMessage.chatId, 'Algo salió mal procesando tu mensaje.');
+  }
+
+  return { statusCode: 200, body: 'ok' };
+};
