@@ -4,14 +4,19 @@ import { ApiStack } from '../lib/stacks/api-stack';
 import { DataStack } from '../lib/stacks/data-stack';
 import { StorageStack } from '../lib/stacks/storage-stack';
 
-// Proyecto personal de 2 usuarios: un solo ambiente, no dev/stg/prod separados.
-// (Desvío consciente del estándar de 3 ambientes — ver CLAUDE.md.)
+// Proyecto personal de 2 usuarios: hoy corre un solo stage (prod). El stage
+// se parametriza vía CDK context (-c stage=xxx) para no tener que reestructurar
+// nada cuando aparezca un segundo — ver CLAUDE.md.
 const app = new App();
+const stage = (app.node.tryGetContext('stage') as string | undefined) ?? 'prod';
 
-const dataStack = new DataStack(app, 'CalorieCompanion-Data');
-const storageStack = new StorageStack(app, 'CalorieCompanion-Storage');
+const suffix = stage.charAt(0).toUpperCase() + stage.slice(1);
 
-new ApiStack(app, 'CalorieCompanion-Api', {
+const dataStack = new DataStack(app, `CalorieCompanion-${suffix}-Data`, { stage });
+const storageStack = new StorageStack(app, `CalorieCompanion-${suffix}-Storage`);
+
+new ApiStack(app, `CalorieCompanion-${suffix}-Api`, {
+  stage,
   table: dataStack.table,
   mediaBucket: storageStack.mediaBucket,
 });

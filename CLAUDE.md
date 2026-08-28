@@ -27,10 +27,13 @@ No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su 
   `AWS::SSM::Parameter`). Por eso estos 3 parámetros se crean **a mano, una sola vez**, fuera de
   CDK:
   ```
-  aws ssm put-parameter --name /calorie-companion/telegram-bot-token --type SecureString --value "..."
-  aws ssm put-parameter --name /calorie-companion/openai-api-key --type SecureString --value "..."
-  aws ssm put-parameter --name /calorie-companion/telegram-webhook-secret --type SecureString --value "..."
+  aws ssm put-parameter --name /calorie-companion/prod/telegram-bot-token --type SecureString --value "..."
+  aws ssm put-parameter --name /calorie-companion/prod/openai-api-key --type SecureString --value "..."
+  aws ssm put-parameter --name /calorie-companion/prod/telegram-webhook-secret --type SecureString --value "..."
   ```
+  El path lleva el stage (`/calorie-companion/<stage>/...`, ver `ssmParamPrefix` en
+  `infra/lib/constructs/discovered-lambda.ts`) aunque hoy solo exista `prod` — evita que un
+  stage nuevo choque con estos parámetros o, peor, los lea por error.
   El nombre del parámetro (no el valor) sí vive en CDK, como env var del Lambda — ver
   `infra/lib/constructs/discovered-lambda.ts`. El Lambda solo tiene permiso
   `ssm:GetParameter` sobre estos 3 ARN puntuales, nada más (least privilege).
@@ -112,9 +115,13 @@ sin redundancia entre `src/` e `infra/`:
   necesite). Los adapters de cada repo port reciben la entidad ElectroDB ya armada por
   constructor — ElectroDB es un detalle de implementación del adapter, el puerto no lo conoce.
 - **vitest** para tests (no jest): nativo en TS/ESM, cero configuración de babel.
-- Un solo ambiente (no dev/stg/prod). Desvío consciente de mi estándar habitual de 3 ambientes
-  en la misma cuenta — no se justifica la complejidad para un proyecto personal de 2 usuarios.
-  Si esto escala, ahí sí se separan ambientes.
+- Un solo ambiente activo (`prod`), pero el stage es un parámetro de CDK context
+  (`-c stage=xxx`, default `prod`), no un valor hardcodeado — ver `infra/bin/app.ts`. Stack IDs,
+  nombres de tabla/función y paths de SSM llevan el stage. Desvío consciente de mi estándar
+  habitual de 3 ambientes reales en la misma cuenta — no se justifica esa complejidad (ni un
+  segundo despliegue) para un proyecto personal de 2 usuarios. El día que aparezca un stage
+  nuevo (p. ej. `dev`), es agregar una rama al `case` de `.github/workflows/deploy.yml` y crear
+  a mano sus 3 parámetros SSM — cero cambios de estructura en `infra/`.
 - HTTP API (API Gateway v2), no REST API — mismo resultado, más barato.
 - Nada de argentinismos, usa español neutro
 

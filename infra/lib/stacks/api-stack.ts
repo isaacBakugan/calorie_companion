@@ -10,6 +10,7 @@ import { DiscoveredLambdaFunction } from '../constructs/discovered-lambda';
 import { discoverLambdas } from '../discover-lambdas';
 
 export interface ApiStackProps extends StackProps {
+  readonly stage: string;
   readonly table: dynamodb.Table;
   readonly mediaBucket: s3.Bucket;
 }
@@ -27,11 +28,12 @@ export class ApiStack extends Stack {
     super(scope, id, props);
 
     const httpApi = new apigwv2.HttpApi(this, 'HttpApi', {
-      apiName: 'calorie-companion-api',
+      apiName: `calorie-companion-${props.stage}-api`,
     });
 
     for (const discovered of discoverLambdas()) {
       const fn = new DiscoveredLambdaFunction(this, discovered.id, {
+        stage: props.stage,
         discovered,
         table: props.table,
         mediaBucket: props.mediaBucket,

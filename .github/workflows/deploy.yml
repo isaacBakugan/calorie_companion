@@ -45,4 +45,13 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - run: pnpm run cdk:deploy
+      # Stage resuelto por rama. Hoy solo existe main -> prod; un stage nuevo
+      # se suma acá como otra rama del case, sin tocar infra/.
+      - name: Resolve stage
+        id: stage
+        run: |
+          case "${{ github.ref_name }}" in
+            main) echo "stage=prod" >> "$GITHUB_OUTPUT" ;;
+            *) echo "No hay stage definido para la rama ${{ github.ref_name }}" >&2; exit 1 ;;
+          esac
+      - run: pnpm run cdk:deploy -- -c stage=${{ steps.stage.outputs.stage }}

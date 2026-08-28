@@ -8,9 +8,12 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import type { DiscoveredLambda } from '../discover-lambdas';
 
-export const SSM_PARAM_PREFIX = '/calorie-companion';
+export function ssmParamPrefix(stage: string): string {
+  return `/calorie-companion/${stage}`;
+}
 
 export interface DiscoveredLambdaFunctionProps {
+  readonly stage: string;
   readonly discovered: DiscoveredLambda;
   readonly table: dynamodb.Table;
   readonly mediaBucket: s3.Bucket;
@@ -31,10 +34,11 @@ export class DiscoveredLambdaFunction extends Construct {
     super(scope, id);
 
     const stack = Stack.of(this);
-    const { discovered, table, mediaBucket } = props;
+    const { stage, discovered, table, mediaBucket } = props;
+    const paramPrefix = ssmParamPrefix(stage);
 
     this.handler = new lambdaNode.NodejsFunction(this, 'Handler', {
-      functionName: `calorie-companion-${discovered.triggerConfig.functionName}`,
+      functionName: `calorie-companion-${stage}-${discovered.triggerConfig.functionName}`,
       runtime: lambda.Runtime.NODEJS_22_X,
       memorySize: discovered.triggerConfig.memorySize ?? 256,
       timeout: Duration.seconds(discovered.triggerConfig.timeoutSeconds ?? 30),
@@ -53,9 +57,9 @@ export class DiscoveredLambdaFunction extends Construct {
       environment: {
         TABLE_NAME: table.tableName,
         BUCKET_NAME: mediaBucket.bucketName,
-        TELEGRAM_TOKEN_PARAM_NAME: `${SSM_PARAM_PREFIX}/telegram-bot-token`,
-        OPENAI_API_KEY_PARAM_NAME: `${SSM_PARAM_PREFIX}/openai-api-key`,
-        TELEGRAM_WEBHOOK_SECRET_PARAM_NAME: `${SSM_PARAM_PREFIX}/telegram-webhook-secret`,
+        TELEGRAM_TOKEN_PARAM_NAME: `${paramPrefix}/telegram-bot-token`,
+        OPENAI_API_KEY_PARAM_NAME: `${paramPrefix}/openai-api-key`,
+        TELEGRAM_WEBHOOK_SECRET_PARAM_NAME: `${paramPrefix}/telegram-webhook-secret`,
       },
     });
 
@@ -66,9 +70,9 @@ export class DiscoveredLambdaFunction extends Construct {
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
-          `arn:aws:ssm:${stack.region}:${stack.account}:parameter${SSM_PARAM_PREFIX}/telegram-bot-token`,
-          `arn:aws:ssm:${stack.region}:${stack.account}:parameter${SSM_PARAM_PREFIX}/openai-api-key`,
-          `arn:aws:ssm:${stack.region}:${stack.account}:parameter${SSM_PARAM_PREFIX}/telegram-webhook-secret`,
+          `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/telegram-bot-token`,
+          `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/openai-api-key`,
+          `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/telegram-webhook-secret`,
         ],
       }),
     );
