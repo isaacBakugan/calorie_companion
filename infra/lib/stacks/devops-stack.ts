@@ -14,15 +14,20 @@ export interface DevOpsStackProps extends StackProps {
  * (`pnpm run devops:prod:deploy`) — nunca desde el propio pipeline de CI, porque
  * es el rol que ese pipeline necesita para existir antes de poder correr.
  *
- * El único permiso que necesita este rol es `sts:AssumeRole` sobre los roles del
- * bootstrap de CDK (`deploy-role`, `file-publishing-role`, `lookup-role`). Con el
- * "new style stack synthesis" (activado en cdk.json), `cdk deploy` asume el
- * `deploy-role` y ES ESE rol el que llama a CloudFormation; la creación real de
- * recursos la hace CloudFormation con el `cfn-exec-role` del bootstrap (permisos
- * amplios por diseño del bootstrap estándar de CDK). Agregar permisos de
- * CloudFormation/Lambda/DynamoDB/etc. directamente acá sería una lista paralela
- * que hay que mantener sincronizada a mano con lo que la app realmente despliega
- * — exactamente el tipo de deuda que se quiere evitar.
+ * Dos caminos de deploy, dos permisos distintos:
+ * - `infra:prod:deploy` (cdk deploy, cambios de infra): solo necesita
+ *   `sts:AssumeRole` sobre los roles del bootstrap de CDK (`deploy-role`,
+ *   `file-publishing-role`, `lookup-role`). Con el "new style stack synthesis"
+ *   (activado en cdk.json), `cdk deploy` asume el `deploy-role` y ES ESE rol
+ *   el que llama a CloudFormation; la creación real de recursos la hace
+ *   CloudFormation con el `cfn-exec-role` del bootstrap (permisos amplios por
+ *   diseño del bootstrap estándar de CDK). Agregar permisos de
+ *   CloudFormation/DynamoDB/etc. directamente acá sería una lista paralela
+ *   que hay que mantener sincronizada a mano con lo que la app realmente
+ *   despliega.
+ * - `lambda:prod:deploy` (código de Lambda, sin CloudFormation): al saltarse
+ *   CDK/CloudFormation por completo, este rol SÍ necesita `lambda:UpdateFunctionCode`
+ *   directo — no hay `cfn-exec-role` de por medio que se lo dé.
  */
 export class DevOpsStack extends Stack {
   constructor(scope: Construct, id: string, props: DevOpsStackProps) {
@@ -58,6 +63,14 @@ export class DevOpsStack extends Stack {
         sid: 'PermitirAsumirRolesDeBootstrapDeCdk',
         actions: ['sts:AssumeRole'],
         resources: [`arn:aws:iam::${this.account}:role/cdk-*-role-${this.account}-${this.region}`],
+      }),
+    );
+
+    deployRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'PermitirActualizarCodigoDeLambdas',
+        actions: ['lambda:UpdateFunctionCode'],
+        resources: [`arn:aws:lambda:${this.region}:${this.account}:function:calorie-companion-*`],
       }),
     );
 

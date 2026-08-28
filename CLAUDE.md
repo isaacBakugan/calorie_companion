@@ -48,10 +48,29 @@ No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su 
   el diff si tocaste `env.ts`, adapters de SSM, o cualquier archivo con "token"/"key"/"secret" en
   el nombre — un secreto commiteado en un repo público es irreversible en la práctica (aunque se
   borre después, hay que rotarlo, no basta con `git revert`).
-- **GitHub OIDC** para el deploy desde CI (`.github/workflows/deploy.yml`): sin access keys de
-  AWS de larga duración en secrets de GitHub. El rol de deploy se crea a mano (o vía un stack de
-  bootstrap aparte) y su ARN se guarda como **variable** de repo (`AWS_DEPLOY_ROLE_ARN`), no como
-  secret — un ARN de rol no es sensible por sí solo.
+- **GitHub OIDC** para el deploy desde CI. Sin access keys de AWS de larga duración en secrets de
+  GitHub. El rol de deploy lo crea `infra/lib/stacks/devops-stack.ts`, desplegado a mano
+  (`pnpm run devops:prod:deploy`, nunca desde CI — ver ese archivo) y su ARN se guarda como
+  **variable** de repo (`AWS_DEPLOY_ROLE_ARN`), no como secret — un ARN de rol no es sensible por
+  sí solo.
+
+## CI/CD: dos pipelines separados
+
+- **`deploy.yml`** (automático, on push a `main`): corre `lambda:prod:deploy`. Actualiza
+  únicamente el código de los Lambdas ya existentes (`UpdateFunctionCode` directo, sin
+  CloudFormation) — no puede agregar rutas, tocar permisos IAM ni env vars nuevos. Rápido y de
+  blast radius chico: lo que sea que rompa, es código, no infra.
+- **`deploy-infra.yml`** (manual, `workflow_dispatch` únicamente): corre `infra:prod:deploy`
+  (`cdk deploy` de los 3 stacks de la app). Acá sí se crean/modifican recursos, rutas y permisos.
+  Nunca toca `CalorieCompanion-DevOps` — excluido por el patrón de nombre `CalorieCompanion-*-*`.
+- **Orden que importa**: si un cambio de código depende de un env var, permiso IAM o ruta nueva,
+  el `infra:prod:deploy` manual tiene que correr **antes** de mergear ese código a `main` — si no,
+  `lambda:prod:deploy` sube código que espera algo que todavía no existe, y el Lambda falla en
+  runtime (`Falta la variable de entorno ...` o `AccessDenied`). Esto no lo valida nada
+  automático — es una regla de secuencia que hay que sostener a mano al mergear.
+- `lambda:prod:deploy` (`infra/bin/deploy-lambda-code.ts`) reutiliza el bundle que ya arma
+  `cdk synth` (esbuild vía `NodejsFunction`) en vez de reimplementar el bundling: una sola fuente
+  de verdad para cómo se empaqueta el código.
 
 ## Arquitectura
 

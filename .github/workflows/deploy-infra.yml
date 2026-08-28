@@ -1,15 +1,12 @@
-name: Deploy Lambda code
+name: Deploy Infra
 
-# Pipeline "básico": solo actualiza el código de los Lambdas ya existentes
-# (sin CloudFormation). No puede crear recursos, agregar rutas ni tocar
-# permisos IAM — para eso está el workflow manual deploy-infra.yml. Si un
-# cambio de código depende de un env var o permiso nuevo, corré ese primero.
+# Pipeline completo: cdk deploy de los 3 stacks de la app (Data/Storage/Api),
+# vía CloudFormation. Puede crear recursos, rutas y permisos IAM nuevos — por
+# eso es manual, nunca on push. Nunca toca CalorieCompanion-DevOps (ver
+# infra:prod:deploy en package.json, que lo excluye por patrón de nombre).
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch: {}
 
 permissions:
   id-token: write # requerido por GitHub OIDC hacia AWS
@@ -32,7 +29,6 @@ jobs:
 
   deploy:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,12 +38,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # El rol se asume vía GitHub OIDC — sin access keys de larga duración
-      # en secrets de GitHub. El ARN del rol no es sensible, se guarda como
-      # variable de repo (no secret). El rol en sí se crea a mano una vez
-      # (ver CLAUDE.md → "Manejo de secretos").
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - run: pnpm run lambda:prod:deploy
+      - run: pnpm run infra:prod:deploy

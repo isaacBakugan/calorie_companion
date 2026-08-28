@@ -3,6 +3,7 @@ import { App } from 'aws-cdk-lib';
 import { ApiStack } from '../lib/stacks/api-stack';
 import { DataStack } from '../lib/stacks/data-stack';
 import { DevOpsStack } from '../lib/stacks/devops-stack';
+import { stackSuffix } from '../lib/stage';
 import { StorageStack } from '../lib/stacks/storage-stack';
 
 // Proyecto personal de 2 usuarios: hoy corre un solo stage (prod). El stage
@@ -11,7 +12,7 @@ import { StorageStack } from '../lib/stacks/storage-stack';
 const app = new App();
 const stage = (app.node.tryGetContext('stage') as string | undefined) ?? 'prod';
 
-const suffix = stage.charAt(0).toUpperCase() + stage.slice(1);
+const suffix = stackSuffix(stage);
 
 const dataStack = new DataStack(app, `CalorieCompanion-${suffix}-Data`, { stage });
 const storageStack = new StorageStack(app, `CalorieCompanion-${suffix}-Storage`);

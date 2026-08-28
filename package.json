@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "cdk:synth": "cd infra && cdk synth",
     "cdk:diff": "cd infra && cdk diff",
-    "cdk:deploy": "cd infra && cdk deploy \"CalorieCompanion-*-*\"",
+    "infra:prod:deploy": "cd infra && cdk deploy \"CalorieCompanion-*-*\" -c stage=prod --require-approval never",
+    "lambda:prod:deploy": "cd infra && ts-node --prefer-ts-exts bin/deploy-lambda-code.ts --stage=prod",
     "devops:prod:deploy": "cd infra && cdk deploy CalorieCompanion-DevOps -c stage=prod"
   },
   "dependencies": {
@@ -30,14 +31,17 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@aws-sdk/client-lambda": "^3.1120.0",
     "@eslint/js": "^10.0.1",
+    "@types/adm-zip": "^0.5.8",
     "@types/aws-lambda": "^8.10.162",
     "@types/node": "^22.20.1",
     "@typescript-eslint/eslint-plugin": "^8.68.0",
     "@typescript-eslint/parser": "^8.68.0",
+    "adm-zip": "^0.6.0",
     "aws-cdk": "^2.1139.0",
-    "eslint": "^10.9.1",
     "esbuild": "^0.28.2",
+    "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.11.0",
     "prettier": "^3.9.6",
