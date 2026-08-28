@@ -32,7 +32,7 @@ No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su 
   aws ssm put-parameter --name /calorie-companion/telegram-webhook-secret --type SecureString --value "..."
   ```
   El nombre del parámetro (no el valor) sí vive en CDK, como env var del Lambda — ver
-  `infra/lib/constructs/telegram-webhook-lambda.ts`. El Lambda solo tiene permiso
+  `infra/lib/constructs/discovered-lambda.ts`. El Lambda solo tiene permiso
   `ssm:GetParameter` sobre estos 3 ARN puntuales, nada más (least privilege).
 - **Nunca** loguear el valor de un secreto. `src/shared/logger.ts` no sanitiza automáticamente —
   quien llame a `logger.*` es responsable de no pasarle un secreto en `meta`.
@@ -59,9 +59,37 @@ Hexagonal (ports & adapters), con la IA tratada como un puerto más. Detalle com
 - Validación de la respuesta de OpenAI con **zod** en el borde del adapter
   (`openai-nutrition-analyzer.adapter.ts`), antes de que el resultado se convierta en un DTO del
   dominio. Si el LLM devuelve algo fuera de schema, falla ahí — no 3 capas después.
-- Sin contenedor de DI: la composición de dependencias es manual en
-  `telegram-webhook-handler.ts` (el único entrypoint). A esta escala, un DI container es overhead
-  puro.
+- Sin contenedor de DI: la composición de dependencias es manual en cada `handler.ts`. A esta
+  escala, un DI container es overhead puro.
+
+## Lambdas: un Lambda por trigger externo, con auto-discovery
+
+Ni single-use por caso de uso ni lambdalith por módulo de dominio: **un Lambda por trigger
+externo real** (un webhook, un cron, una cola). Los casos de uso ya están aislados detrás de
+ports — partirlos en Lambdas separadas no gana nada salvo que exista más de un trigger físico
+que los dispare. Cuando aparezca un segundo trigger (p. ej. un cron de limpieza), ahí nace su
+propio Lambda — no antes.
+
+La infra **no tiene un `NodejsFunction` hardcodeado por función**. Convención de auto-discovery,
+sin redundancia entre `src/` e `infra/`:
+
+- Cada carpeta `src/adapters/inbound/<nombre>/` con un `trigger.config.ts` es un Lambda
+  desplegable. `infra/lib/discover-lambdas.ts` escanea esa carpeta en tiempo de `synth` y arma
+  el `NodejsFunction` (`infra/lib/constructs/discovered-lambda.ts`) + su trigger (ruta HTTP,
+  regla de EventBridge, etc.) en `infra/lib/stacks/api-stack.ts`.
+- Contrato: `handler.ts` (el entrypoint real) + `trigger.config.ts` (metadata declarativa pura,
+  tipada contra `TriggerConfig` en `src/shared/types/trigger-config.ts`: tipo de trigger,
+  path/método o cron, memoria, timeout).
+- **Agregar un trigger nuevo = agregar esa carpeta del lado de `src/`. Cero cambios en
+  `infra/`.** Si te encontrás editando `api-stack.ts` o `discover-lambdas.ts` para "registrar" un
+  Lambda nuevo, algo se rompió en la convención — no lo hardcodees, arreglá el discovery.
+- `trigger.config.ts` debe ser **puro y sin efectos secundarios**: solo importa el tipo
+  (`import type`) y exporta un objeto literal. Nunca importe adapters, SDKs, ni nada que se
+  ejecute — `infra/` lo `require()`a directamente en tiempo de synth para leer su metadata, no
+  para correrlo.
+- Tipos de trigger soportados hoy: `http` (ruta en el HTTP API compartido) y `schedule` (regla de
+  EventBridge). Agregar uno nuevo (`sqs`, `s3`, etc.) es una variante más en `TriggerConfig` +
+  una rama más en el switch de `api-stack.ts`.
 
 ## Stack (decisiones ya tomadas al scaffoldear)
 
@@ -78,6 +106,7 @@ Hexagonal (ports & adapters), con la IA tratada como un puerto más. Detalle com
   en la misma cuenta — no se justifica la complejidad para un proyecto personal de 2 usuarios.
   Si esto escala, ahí sí se separan ambientes.
 - HTTP API (API Gateway v2), no REST API — mismo resultado, más barato.
+- Nada de argentinismos, usa español neutro
 
 ## Decisiones abiertas (no las resuelvas sin avisar)
 
@@ -87,12 +116,12 @@ Hexagonal (ports & adapters), con la IA tratada como un puerto más. Detalle com
   da un resultado incorrecto silenciosamente. No lo "arregles" agregando lógica de detección de
   proporciones sin confirmar conmigo — es una simplificación consciente del MVP, documentada acá
   para no perderla de vista.
-- **UX de conversación**: el router de `telegram-webhook-handler.ts` usa comandos explícitos
-  (`/registrar`, `/porcion`, `/consumo`, `/resumen`) como placeholder funcional. El README dice
-  que el flujo lo decide "la lógica de la app, no la IA", pero no define si eso significa
-  comandos, texto libre parseado con reglas, o algo intermedio. Está pendiente en el README como
-  "Próximos pasos" — no lo dejes fijo en comandos sin confirmar que es la UX deseada.
-- **Un solo `TelegramWebhookLambda`** atiende registro y consulta. Si el volumen de fotos vs.
-  consultas de texto diverge mucho, separar en dos funciones (una liviana para consultas
-  matemáticas, otra para el flujo de IA) podría bajar el tiempo de cold start de las consultas
-  simples — no vale la pena hoy a este volumen.
+- **UX de conversación**: el router de `src/adapters/inbound/telegram-webhook/handler.ts` usa
+  comandos explícitos (`/registrar`, `/porcion`, `/consumo`, `/resumen`) como placeholder
+  funcional. El README dice que el flujo lo decide "la lógica de la app, no la IA", pero no
+  define si eso significa comandos, texto libre parseado con reglas, o algo intermedio. Está
+  pendiente en el README como "Próximos pasos" — no lo dejes fijo en comandos sin confirmar que
+  es la UX deseada.
+- **Un solo Lambda `telegram-webhook`** atiende registro y consulta (es un único trigger físico,
+  ver "Lambdas" arriba). Si el volumen de fotos vs. consultas de texto diverge mucho, el criterio
+  para separar sigue siendo el mismo: un trigger físico nuevo, no un caso de uso nuevo.

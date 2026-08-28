@@ -45,11 +45,12 @@ calorie-companion/
 │   ├── bin/app.ts
 │   ├── lib/
 │   │   ├── stacks/
-│   │   │   ├── api-stack.ts                 # API Gateway + Lambda integration
+│   │   │   ├── api-stack.ts                 # arma rutas/reglas a partir de discover-lambdas.ts
 │   │   │   ├── data-stack.ts                # DynamoDB single-table
 │   │   │   └── storage-stack.ts             # S3 + lifecycle policy
-│   │   └── constructs/
-│   │       └── telegram-webhook-lambda.ts
+│   │   ├── constructs/
+│   │   │   └── discovered-lambda.ts         # wrapper genérico de NodejsFunction
+│   │   └── discover-lambdas.ts              # auto-discovery: lee trigger.config.ts de cada inbound/*
 │   ├── cdk.json
 │   └── tsconfig.json
 │
@@ -81,10 +82,11 @@ calorie-companion/
 │   │       └── get-daily-summary.ts
 │   │
 │   ├── adapters/
-│   │   ├── inbound/
-│   │   │   └── telegram/
-│   │   │       ├── telegram-webhook-handler.ts   # entrypoint Lambda
-│   │   │       └── telegram-message-parser.ts
+│   │   ├── inbound/                         # 1 carpeta = 1 Lambda descubierto por infra/
+│   │   │   └── telegram-webhook/
+│   │   │       ├── handler.ts                    # entrypoint Lambda
+│   │   │       ├── telegram-message-parser.ts
+│   │   │       └── trigger.config.ts             # declara el trigger (http/schedule/...) para infra/
 │   │   └── outbound/
 │   │       ├── ai/
 │   │       │   ├── openai-nutrition-analyzer.adapter.ts
@@ -93,13 +95,16 @@ calorie-companion/
 │   │       │   ├── dynamo-batch-repository.adapter.ts
 │   │       │   ├── dynamo-user-repository.adapter.ts
 │   │       │   ├── dynamo-log-repository.adapter.ts
+│   │       │   ├── dynamo-nutrition-cache-repository.adapter.ts   # cache del NutritionAnalyzerPort
 │   │       │   └── single-table-schema.ts
 │   │       ├── storage/s3-media-storage.adapter.ts
 │   │       └── messaging/telegram-messaging.adapter.ts
 │   │
 │   └── shared/
 │       ├── config/env.ts
-│       ├── types/result.ts                  # Result<T,E>, sin excepciones a lo loco
+│       ├── types/
+│       │   ├── result.ts                    # Result<T,E>, sin excepciones a lo loco
+│       │   └── trigger-config.ts            # contrato TriggerConfig entre inbound/ e infra/
 │       └── logger.ts
 │
 ├── test/
