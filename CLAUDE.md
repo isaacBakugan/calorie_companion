@@ -25,15 +25,20 @@ No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su 
   sin costo). Guarda: `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `TELEGRAM_WEBHOOK_SECRET`,
   `TEST_API_KEY` (autentica pruebas manuales vía `x-api-key`, sin pasar por Telegram — la usa
   cualquier Lambda con `requiresTestApiKey: true` en su `trigger.config.ts`; ver
-  `src/shared/auth/test-api-key.ts`). Ningún endpoint queda sin autenticar, ni siquiera `/health`.
+  `src/shared/auth/test-api-key.ts`) y `ALLOWED_TELEGRAM_USER_IDS` (los IDs numéricos de Telegram
+  de ustedes dos, coma-separados — segunda barrera solo para la vía Telegram: el secret_token de
+  `setWebhook` prueba que la request viene de Telegram, no de quién; ver
+  `isAllowedTelegramUserId` en `telegram-auth.middleware.ts`). Ningún endpoint queda sin
+  autenticar, ni siquiera `/health`.
 - **CloudFormation/CDK NO puede crear parámetros `SecureString`** (limitación conocida de
-  `AWS::SSM::Parameter`). Por eso estos 4 parámetros se crean **a mano, una sola vez**, fuera de
+  `AWS::SSM::Parameter`). Por eso estos 5 parámetros se crean **a mano, una sola vez**, fuera de
   CDK:
   ```
   aws ssm put-parameter --name /calorie-companion/prod/telegram-bot-token --type SecureString --value "..."
   aws ssm put-parameter --name /calorie-companion/prod/openai-api-key --type SecureString --value "..."
   aws ssm put-parameter --name /calorie-companion/prod/telegram-webhook-secret --type SecureString --value "..."
   aws ssm put-parameter --name /calorie-companion/prod/test-api-key --type SecureString --value "..."
+  aws ssm put-parameter --name /calorie-companion/prod/allowed-telegram-user-ids --type SecureString --value "111111111,222222222"
   ```
   El path lleva el stage (`/calorie-companion/<stage>/...`, ver `ssmParamPrefix` en
   `infra/lib/constructs/discovered-lambda.ts`) aunque hoy solo exista `prod` — evita que un
@@ -41,7 +46,7 @@ No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su 
   El nombre del parámetro (no el valor) sí vive en CDK, como env var del Lambda — ver
   `infra/lib/constructs/discovered-lambda.ts`. El Lambda solo tiene permiso
   `ssm:GetParameter` sobre los ARN puntuales que usa (3 para el resto de los Lambdas
-  descubiertos, 4 para `telegram-webhook`), nada más (least privilege).
+  descubiertos, 5 para `telegram-webhook`), nada más (least privilege).
 - **Nunca** loguear el valor de un secreto. `src/shared/logger.ts` no sanitiza automáticamente —
   quien llame a `logger.*` es responsable de no pasarle un secreto en `meta`.
 - `.env` es solo para desarrollo local y está en `.gitignore`. Antes de cualquier commit, revisa

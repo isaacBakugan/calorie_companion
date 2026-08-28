@@ -5,6 +5,7 @@ import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 // varía por stage. Se pasan a getSecret().
 export const TELEGRAM_WEBHOOK_SECRET_ENV_VAR = 'TELEGRAM_WEBHOOK_SECRET_PARAM_NAME';
 export const TEST_API_KEY_ENV_VAR = 'TEST_API_KEY_PARAM_NAME';
+export const ALLOWED_TELEGRAM_USER_IDS_ENV_VAR = 'ALLOWED_TELEGRAM_USER_IDS_PARAM_NAME';
 
 /** Config no sensible: la inyecta CDK como env var del Lambda. Segura de loguear. */
 export function getConfig() {

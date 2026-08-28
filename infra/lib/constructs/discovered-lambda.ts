@@ -36,9 +36,10 @@ export class DiscoveredLambdaFunction extends Construct {
     const stack = Stack.of(this);
     const { stage, discovered, table, mediaBucket } = props;
     const paramPrefix = ssmParamPrefix(stage);
-    // Declarativo desde trigger.config.ts (requiresTestApiKey): quién necesita
-    // el test-api-key lo decide cada Lambda, no una lista de nombres acá.
+    // Declarativo desde trigger.config.ts: quién necesita cada secreto extra
+    // lo decide cada Lambda, no una lista de nombres acá.
     const needsTestApiKey = discovered.triggerConfig.requiresTestApiKey ?? false;
+    const needsTelegramUserWhitelist = discovered.triggerConfig.requiresTelegramUserWhitelist ?? false;
 
     this.handler = new lambdaNode.NodejsFunction(this, 'Handler', {
       functionName: `calorie-companion-${stage}-${discovered.triggerConfig.functionName}`,
@@ -64,6 +65,9 @@ export class DiscoveredLambdaFunction extends Construct {
         OPENAI_API_KEY_PARAM_NAME: `${paramPrefix}/openai-api-key`,
         TELEGRAM_WEBHOOK_SECRET_PARAM_NAME: `${paramPrefix}/telegram-webhook-secret`,
         ...(needsTestApiKey ? { TEST_API_KEY_PARAM_NAME: `${paramPrefix}/test-api-key` } : {}),
+        ...(needsTelegramUserWhitelist
+          ? { ALLOWED_TELEGRAM_USER_IDS_PARAM_NAME: `${paramPrefix}/allowed-telegram-user-ids` }
+          : {}),
       },
     });
 
@@ -79,6 +83,11 @@ export class DiscoveredLambdaFunction extends Construct {
           `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/telegram-webhook-secret`,
           ...(needsTestApiKey
             ? [`arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/test-api-key`]
+            : []),
+          ...(needsTelegramUserWhitelist
+            ? [
+                `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/allowed-telegram-user-ids`,
+              ]
             : []),
         ],
       }),

@@ -1,4 +1,8 @@
-import { getSecret, TELEGRAM_WEBHOOK_SECRET_ENV_VAR } from '@shared/config/env';
+import {
+  getSecret,
+  ALLOWED_TELEGRAM_USER_IDS_ENV_VAR,
+  TELEGRAM_WEBHOOK_SECRET_ENV_VAR,
+} from '@shared/config/env';
 import { isValidTestApiKey } from '@shared/auth/test-api-key';
 
 export type AuthSource = 'telegram' | 'test';
@@ -32,4 +36,19 @@ export async function authenticateTelegramRequest(
   }
 
   return { authenticated: false, source: null };
+}
+
+/**
+ * El secret_token de `setWebhook` solo prueba que la request viene de
+ * Telegram — cualquiera que le escriba al bot pasa esa validación. Esta es
+ * la segunda barrera: exactamente los IDs numéricos de Telegram (`from.id`
+ * del Update) que están en la whitelist de SSM, coma-separados. No aplica a
+ * la vía de test (`x-api-key` ya es su propio secreto).
+ */
+export async function isAllowedTelegramUserId(telegramUserId: string): Promise<boolean> {
+  const allowedIds = await getSecret(ALLOWED_TELEGRAM_USER_IDS_ENV_VAR);
+  return allowedIds
+    .split(',')
+    .map((id) => id.trim())
+    .includes(telegramUserId);
 }

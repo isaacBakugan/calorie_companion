@@ -8,4 +8,5 @@ export const triggerConfig = {
   method: 'POST',
   path: '/telegram/webhook',
   requiresTestApiKey: true,
+  requiresTelegramUserWhitelist: true,
 } satisfies TriggerConfig;

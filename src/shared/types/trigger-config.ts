@@ -10,6 +10,12 @@ export interface BaseTriggerConfig {
    * función para decidir a quién dárselo.
    */
   readonly requiresTestApiKey?: boolean;
+  /**
+   * Si este Lambda necesita leer la whitelist de IDs de Telegram autorizados
+   * (ver isAllowedTelegramUserId en telegram-auth.middleware.ts). Solo lo
+   * necesita telegram-webhook.
+   */
+  readonly requiresTelegramUserWhitelist?: boolean;
 }
 
 export interface HttpTriggerConfig extends BaseTriggerConfig {

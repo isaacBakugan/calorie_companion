@@ -15,7 +15,7 @@ import { DynamoUserRepository } from '../../outbound/persistence/dynamodb/dynamo
 import { DynamoLogRepository } from '../../outbound/persistence/dynamodb/dynamo-log-repository.adapter';
 import { DynamoNutritionCacheRepository } from '../../outbound/persistence/dynamodb/dynamo-nutrition-cache-repository.adapter';
 import { TelegramMessaging } from '../../outbound/messaging/telegram-messaging.adapter';
-import { authenticateTelegramRequest } from '../telegram/telegram-auth.middleware';
+import { authenticateTelegramRequest, isAllowedTelegramUserId } from '../telegram/telegram-auth.middleware';
 import { parseTelegramUpdate, parseTestPayload } from './telegram-message-parser';
 
 // Módulo se reusa entre invocaciones "warm" del mismo contenedor Lambda: el
@@ -72,6 +72,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEv
       : parseTestPayload(event.body ?? '{}');
   if (!parsedMessage) {
     // Update sin mensaje de texto/foto (p.ej. edición, reacción): se ignora sin error.
+    return { statusCode: 200, body: 'ok' };
+  }
+
+  // El secret_token solo prueba que la request es de Telegram, no de quién:
+  // cualquiera que le escriba al bot llega hasta acá. Esta es la segunda
+  // barrera, exclusiva de la vía Telegram (la de test ya tiene su propio
+  // secreto). Silencioso a propósito: mismo shape que un update ignorado,
+  // sin pista de que el bot existe ni de por qué no respondió.
+  if (auth.source === 'telegram' && !(await isAllowedTelegramUserId(parsedMessage.telegramUserId))) {
+    logger.warn('Telegram user no autorizado', { telegramUserId: parsedMessage.telegramUserId });
     return { statusCode: 200, body: 'ok' };
   }
 
