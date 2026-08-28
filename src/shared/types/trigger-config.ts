@@ -3,6 +3,13 @@ export interface BaseTriggerConfig {
   readonly functionName: string;
   readonly memorySize?: number;
   readonly timeoutSeconds?: number;
+  /**
+   * Si este Lambda necesita leer el parámetro SSM de test-api-key para
+   * autenticar pruebas manuales (ver src/shared/auth/test-api-key.ts).
+   * Declarativo a propósito: así infra/ no tiene que conocer nombres de
+   * función para decidir a quién dárselo.
+   */
+  readonly requiresTestApiKey?: boolean;
 }
 
 export interface HttpTriggerConfig extends BaseTriggerConfig {

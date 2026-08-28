@@ -29,6 +29,18 @@ export class ApiStack extends Stack {
 
     const httpApi = new apigwv2.HttpApi(this, 'HttpApi', {
       apiName: `calorie-companion-${props.stage}-api`,
+      // Sin stage automático: se reemplaza por uno explícito abajo para
+      // poder ponerle throttling. `stageName` default ('$default') mantiene
+      // la misma URL de siempre (sin segmento de stage en el path).
+      createDefaultStage: false,
+    });
+
+    // 2 usuarios, nunca debería acercarse a esto — el límite existe para
+    // contener abuso de un endpoint público, no para el tráfico real.
+    new apigwv2.HttpStage(this, 'DefaultStage', {
+      httpApi,
+      autoDeploy: true,
+      throttle: { rateLimit: 5, burstLimit: 10 },
     });
 
     for (const discovered of discoverLambdas()) {

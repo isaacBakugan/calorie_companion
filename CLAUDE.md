@@ -23,8 +23,9 @@ No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su 
 
 - **SSM Parameter Store, tipo `SecureString`**, cifrado con la KMS key default de AWS (`aws/ssm`,
   sin costo). Guarda: `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `TELEGRAM_WEBHOOK_SECRET`,
-  `TEST_API_KEY` (esta última solo la usa `telegram-webhook` para autenticar pruebas manuales
-  vía `x-api-key`, sin pasar por Telegram — ver `telegram-auth.middleware.ts`).
+  `TEST_API_KEY` (autentica pruebas manuales vía `x-api-key`, sin pasar por Telegram — la usa
+  cualquier Lambda con `requiresTestApiKey: true` en su `trigger.config.ts`; ver
+  `src/shared/auth/test-api-key.ts`). Ningún endpoint queda sin autenticar, ni siquiera `/health`.
 - **CloudFormation/CDK NO puede crear parámetros `SecureString`** (limitación conocida de
   `AWS::SSM::Parameter`). Por eso estos 4 parámetros se crean **a mano, una sola vez**, fuera de
   CDK:

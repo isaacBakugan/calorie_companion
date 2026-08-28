@@ -7,4 +7,5 @@ export const triggerConfig = {
   trigger: 'http',
   method: 'GET',
   path: '/health',
+  requiresTestApiKey: true,
 } satisfies TriggerConfig;

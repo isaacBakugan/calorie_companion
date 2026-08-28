@@ -36,9 +36,9 @@ export class DiscoveredLambdaFunction extends Construct {
     const stack = Stack.of(this);
     const { stage, discovered, table, mediaBucket } = props;
     const paramPrefix = ssmParamPrefix(stage);
-    // El test-api-key solo tiene sentido para probar el webhook de Telegram a
-    // mano (curl/Postman) — no se le da al resto de los Lambdas descubiertos.
-    const isTelegramWebhook = discovered.triggerConfig.functionName === 'telegram-webhook';
+    // Declarativo desde trigger.config.ts (requiresTestApiKey): quién necesita
+    // el test-api-key lo decide cada Lambda, no una lista de nombres acá.
+    const needsTestApiKey = discovered.triggerConfig.requiresTestApiKey ?? false;
 
     this.handler = new lambdaNode.NodejsFunction(this, 'Handler', {
       functionName: `calorie-companion-${stage}-${discovered.triggerConfig.functionName}`,
@@ -63,7 +63,7 @@ export class DiscoveredLambdaFunction extends Construct {
         TELEGRAM_TOKEN_PARAM_NAME: `${paramPrefix}/telegram-bot-token`,
         OPENAI_API_KEY_PARAM_NAME: `${paramPrefix}/openai-api-key`,
         TELEGRAM_WEBHOOK_SECRET_PARAM_NAME: `${paramPrefix}/telegram-webhook-secret`,
-        ...(isTelegramWebhook ? { TEST_API_KEY_PARAM_NAME: `${paramPrefix}/test-api-key` } : {}),
+        ...(needsTestApiKey ? { TEST_API_KEY_PARAM_NAME: `${paramPrefix}/test-api-key` } : {}),
       },
     });
 
@@ -77,7 +77,7 @@ export class DiscoveredLambdaFunction extends Construct {
           `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/telegram-bot-token`,
           `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/openai-api-key`,
           `arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/telegram-webhook-secret`,
-          ...(isTelegramWebhook
+          ...(needsTestApiKey
             ? [`arn:aws:ssm:${stack.region}:${stack.account}:parameter${paramPrefix}/test-api-key`]
             : []),
         ],

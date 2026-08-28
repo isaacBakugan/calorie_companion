@@ -1,4 +1,5 @@
-import { getSecret, TELEGRAM_WEBHOOK_SECRET_ENV_VAR, TEST_API_KEY_ENV_VAR } from '@shared/config/env';
+import { getSecret, TELEGRAM_WEBHOOK_SECRET_ENV_VAR } from '@shared/config/env';
+import { isValidTestApiKey } from '@shared/auth/test-api-key';
 
 export type AuthSource = 'telegram' | 'test';
 
@@ -26,8 +27,7 @@ export async function authenticateTelegramRequest(
     return { authenticated: true, source: 'telegram' };
   }
 
-  const testApiKey = await getSecret(TEST_API_KEY_ENV_VAR);
-  if (headers['x-api-key'] === testApiKey) {
+  if (await isValidTestApiKey(headers)) {
     return { authenticated: true, source: 'test' };
   }
 
