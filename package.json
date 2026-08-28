@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "cdk:synth": "cd infra && cdk synth",
     "cdk:diff": "cd infra && cdk diff",
-    "cdk:deploy": "cd infra && cdk deploy --all"
+    "cdk:deploy": "cd infra && cdk deploy \"CalorieCompanion-*-*\"",
+    "devops:prod:deploy": "cd infra && cdk deploy CalorieCompanion-DevOps -c stage=prod"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1120.0",
