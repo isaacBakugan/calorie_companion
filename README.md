@@ -124,4 +124,4 @@ calorie-companion/
 - [ ] Definir schema de validación (zod) para la respuesta del `NutritionAnalyzerPort`
 - [ ] Prompt de extracción para OpenAI (texto/foto → JSON estructurado)
 - [ ] Scaffold real: `package.json`, `tsconfig.json`, CDK boilerplate mínimo
-- [ ] Lógica de normalización de nombres de batch para cache matching
+- [ ] Lógica de normalización de nombres de batch para cache matchings d
