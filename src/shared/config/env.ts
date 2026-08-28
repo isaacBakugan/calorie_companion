@@ -1,5 +1,11 @@
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 
+// Nombres de los env vars que CDK inyecta con el path real del parámetro SSM
+// (ver infra/lib/constructs/discovered-lambda.ts) — no el path en sí, que
+// varía por stage. Se pasan a getSecret().
+export const TELEGRAM_WEBHOOK_SECRET_ENV_VAR = 'TELEGRAM_WEBHOOK_SECRET_PARAM_NAME';
+export const TEST_API_KEY_ENV_VAR = 'TEST_API_KEY_PARAM_NAME';
+
 /** Config no sensible: la inyecta CDK como env var del Lambda. Segura de loguear. */
 export function getConfig() {
   return {

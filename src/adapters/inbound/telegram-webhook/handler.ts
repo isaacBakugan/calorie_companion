@@ -15,7 +15,8 @@ import { DynamoUserRepository } from '../../outbound/persistence/dynamodb/dynamo
 import { DynamoLogRepository } from '../../outbound/persistence/dynamodb/dynamo-log-repository.adapter';
 import { DynamoNutritionCacheRepository } from '../../outbound/persistence/dynamodb/dynamo-nutrition-cache-repository.adapter';
 import { TelegramMessaging } from '../../outbound/messaging/telegram-messaging.adapter';
-import { parseTelegramUpdate } from './telegram-message-parser';
+import { authenticateTelegramRequest } from '../telegram/telegram-auth.middleware';
+import { parseTelegramUpdate, parseTestPayload } from './telegram-message-parser';
 
 // Módulo se reusa entre invocaciones "warm" del mismo contenedor Lambda: el
 // client de Dynamo y las entidades de ElectroDB se arman una sola vez por
@@ -51,15 +52,24 @@ async function downloadTelegramPhotoAsBase64(botToken: string, fileId: string): 
   return Buffer.from(arrayBuffer).toString('base64');
 }
 
+async function downloadUrlAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer).toString('base64');
+}
+
 export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEventV2) => {
-  const webhookSecret = await getSecret('TELEGRAM_WEBHOOK_SECRET_PARAM_NAME');
-  const receivedSecret = event.headers?.['x-telegram-bot-api-secret-token'];
-  if (receivedSecret !== webhookSecret) {
-    logger.warn('Webhook rechazado: secret token inválido');
-    return { statusCode: 401, body: 'unauthorized' };
+  // Primero que nada: sin credencial válida, ni Dynamo ni OpenAI se tocan.
+  const auth = await authenticateTelegramRequest(event.headers ?? {});
+  if (!auth.authenticated) {
+    logger.warn('Webhook rechazado: sin credencial válida');
+    return { statusCode: 401, body: '' };
   }
 
-  const parsedMessage = parseTelegramUpdate(event.body ?? '{}');
+  const parsedMessage =
+    auth.source === 'telegram'
+      ? parseTelegramUpdate(event.body ?? '{}')
+      : parseTestPayload(event.body ?? '{}');
   if (!parsedMessage) {
     // Update sin mensaje de texto/foto (p.ej. edición, reacción): se ignora sin error.
     return { statusCode: 200, body: 'ok' };
@@ -91,7 +101,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEv
         }
         const imageBase64 = parsedMessage.photoFileId
           ? await downloadTelegramPhotoAsBase64(botToken, parsedMessage.photoFileId)
-          : undefined;
+          : parsedMessage.photoUrl
+            ? await downloadUrlAsBase64(parsedMessage.photoUrl)
+            : undefined;
         const batch = await new RegisterNewBatchUseCase(analyzer, batches).execute({
           userId,
           name,

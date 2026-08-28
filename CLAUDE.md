@@ -22,21 +22,25 @@ Bot de Telegram para bulk-cooking, 2 usuarios, repo público. Contexto de produc
 No hay Secrets Manager — no se justifica su costo fijo para 2 usuarios. En su lugar:
 
 - **SSM Parameter Store, tipo `SecureString`**, cifrado con la KMS key default de AWS (`aws/ssm`,
-  sin costo). Guarda: `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `TELEGRAM_WEBHOOK_SECRET`.
+  sin costo). Guarda: `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `TELEGRAM_WEBHOOK_SECRET`,
+  `TEST_API_KEY` (esta última solo la usa `telegram-webhook` para autenticar pruebas manuales
+  vía `x-api-key`, sin pasar por Telegram — ver `telegram-auth.middleware.ts`).
 - **CloudFormation/CDK NO puede crear parámetros `SecureString`** (limitación conocida de
-  `AWS::SSM::Parameter`). Por eso estos 3 parámetros se crean **a mano, una sola vez**, fuera de
+  `AWS::SSM::Parameter`). Por eso estos 4 parámetros se crean **a mano, una sola vez**, fuera de
   CDK:
   ```
   aws ssm put-parameter --name /calorie-companion/prod/telegram-bot-token --type SecureString --value "..."
   aws ssm put-parameter --name /calorie-companion/prod/openai-api-key --type SecureString --value "..."
   aws ssm put-parameter --name /calorie-companion/prod/telegram-webhook-secret --type SecureString --value "..."
+  aws ssm put-parameter --name /calorie-companion/prod/test-api-key --type SecureString --value "..."
   ```
   El path lleva el stage (`/calorie-companion/<stage>/...`, ver `ssmParamPrefix` en
   `infra/lib/constructs/discovered-lambda.ts`) aunque hoy solo exista `prod` — evita que un
   stage nuevo choque con estos parámetros o, peor, los lea por error.
   El nombre del parámetro (no el valor) sí vive en CDK, como env var del Lambda — ver
   `infra/lib/constructs/discovered-lambda.ts`. El Lambda solo tiene permiso
-  `ssm:GetParameter` sobre estos 3 ARN puntuales, nada más (least privilege).
+  `ssm:GetParameter` sobre los ARN puntuales que usa (3 para el resto de los Lambdas
+  descubiertos, 4 para `telegram-webhook`), nada más (least privilege).
 - **Nunca** loguear el valor de un secreto. `src/shared/logger.ts` no sanitiza automáticamente —
   quien llame a `logger.*` es responsable de no pasarle un secreto en `meta`.
 - `.env` es solo para desarrollo local y está en `.gitignore`. Antes de cualquier commit, revisa
