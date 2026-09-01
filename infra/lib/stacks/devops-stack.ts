@@ -51,9 +51,10 @@ export class DevOpsStack extends Stack {
           'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
         },
         StringLike: {
-          'token.actions.githubusercontent.com:sub': props.allowedBranches.map(
-            (branch) => `repo:${props.githubOrg}/${props.githubRepo}:ref:refs/heads/${branch}`,
-          ),
+          'token.actions.githubusercontent.com:sub': [
+            `repo:${props.githubOrg}/${props.githubRepo}:*`,
+            `repo:${props.githubOrg.toLowerCase()}/${props.githubRepo}:*`,
+          ],
         },
       }),
     });
