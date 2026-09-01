@@ -56,7 +56,11 @@ export class DevOpsStack extends Stack {
           'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
         },
         StringLike: {
-          'token.actions.githubusercontent.com:sub': `repo:${props.githubOrg}/${props.githubRepo}:*`,
+          'token.actions.githubusercontent.com:sub': [
+            `repo:isaacBakugan/${props.githubRepo}:*`,
+            `repo:IsaacBakugan/${props.githubRepo}:*`,
+            `repo:isaacbakugan/${props.githubRepo}:*`,
+          ],
         },
       }),
     });
