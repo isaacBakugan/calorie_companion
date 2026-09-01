@@ -38,6 +38,7 @@ const HELP_TEXT = [
   '/consumo <batchId> <gramos> — registra lo que te serviste',
   '/resumen — tus macros consumidos y restantes de hoy',
   '/ping — estado operativo del bot',
+  '/pingopenai — prueba la conexión a OpenAI',
 ].join('\n');
 
 async function downloadTelegramPhotoAsBase64(botToken: string, fileId: string): Promise<string> {
@@ -174,6 +175,17 @@ export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEv
         } else {
           await messaging.sendText(parsedMessage.chatId, 'Bot con problemas de configuración ⚠️');
         }
+        break;
+      }
+      case '/pingopenai': {
+        const OpenAI = (await import('openai')).default;
+        const client = new OpenAI({ apiKey: openAiApiKey });
+        const completion = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'Di "¡Hola! Conexión a OpenAI exitosa desde Telegram."' }],
+        });
+        const responseText = completion.choices[0]?.message.content ?? 'Sin respuesta de OpenAI';
+        await messaging.sendText(parsedMessage.chatId, responseText);
         break;
       }
       default: {
