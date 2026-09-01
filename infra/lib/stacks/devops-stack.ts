@@ -56,18 +56,7 @@ export class DevOpsStack extends Stack {
           'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
         },
         StringLike: {
-          'token.actions.githubusercontent.com:sub': [
-            `repo:${props.githubOrg}/${props.githubRepo}:*`,
-            `repo:${props.githubOrg.toLowerCase()}/${props.githubRepo}:*`,
-            `repo:${props.githubOrg}/calorie-companion:*`,
-            `repo:${props.githubOrg.toLowerCase()}/calorie-companion:*`,
-            `repo:*Bakugan/calorie_companion:*`,
-            `repo:*bakugan/calorie_companion:*`,
-            `repo:*Bakugan/calorie-companion:*`,
-            `repo:*bakugan/calorie-companion:*`,
-            `repo:*/calorie_companion:*`,
-            `repo:*/calorie-companion:*`
-          ],
+          'token.actions.githubusercontent.com:sub': `repo:${props.githubOrg}/${props.githubRepo}:*`,
         },
       }),
     });
