@@ -37,6 +37,7 @@ const HELP_TEXT = [
   '/porcion <batchId> — cuánto servirte hoy de ese batch',
   '/consumo <batchId> <gramos> — registra lo que te serviste',
   '/resumen — tus macros consumidos y restantes de hoy',
+  '/ping — estado operativo del bot',
 ].join('\n');
 
 async function downloadTelegramPhotoAsBase64(botToken: string, fileId: string): Promise<string> {
@@ -163,6 +164,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event: APIGatewayProxyEv
           parsedMessage.chatId,
           `Hoy consumiste ${Math.round(summary.consumed.kcal)} kcal. Te quedan ${Math.round(summary.remaining.kcal)} kcal.`,
         );
+        break;
+      }
+      case '/ping':
+      case '/health': {
+        const healthy = Boolean(config.tableName && config.bucketName);
+        if (healthy) {
+          await messaging.sendText(parsedMessage.chatId, 'Bot operativo ✅');
+        } else {
+          await messaging.sendText(parsedMessage.chatId, 'Bot con problemas de configuración ⚠️');
+        }
         break;
       }
       default: {
