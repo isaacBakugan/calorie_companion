@@ -57,9 +57,8 @@ export class DevOpsStack extends Stack {
         },
         StringLike: {
           'token.actions.githubusercontent.com:sub': [
-            `repo:isaacBakugan/${props.githubRepo}:*`,
-            `repo:IsaacBakugan/${props.githubRepo}:*`,
-            `repo:isaacbakugan/${props.githubRepo}:*`,
+            `repo:*/calorie_companion*`,
+            `repo:*/calorie-companion*`,
           ],
         },
       }),

@@ -45,6 +45,16 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Debug OIDC Token Claims
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            console.log('=========================================');
+            console.log('EL CLAIM SUB EXACTO DE GITHUB ES:', payload.sub);
+            console.log('=========================================');
+
       # El rol se asume vía GitHub OIDC — sin access keys de larga duración
       # en secrets de GitHub. El ARN del rol no es sensible, se guarda como
       # variable de repo (no secret). El rol en sí se crea a mano una vez
