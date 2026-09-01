@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { App } from 'aws-cdk-lib';
+import { App, Tags } from 'aws-cdk-lib';
 import { ApiStack } from '../lib/stacks/api-stack';
 import { DataStack } from '../lib/stacks/data-stack';
 import { DevOpsStack } from '../lib/stacks/devops-stack';
@@ -11,6 +11,9 @@ import { StorageStack } from '../lib/stacks/storage-stack';
 // nada cuando aparezca un segundo — ver CLAUDE.md.
 const app = new App();
 const stage = (app.node.tryGetContext('stage') as string | undefined) ?? 'prod';
+
+Tags.of(app).add('project', 'calorie');
+Tags.of(app).add('stage', stage);
 
 const suffix = stackSuffix(stage);
 
