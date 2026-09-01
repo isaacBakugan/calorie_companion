@@ -41,6 +41,11 @@ export class DevOpsStack extends Stack {
     const githubProvider = new iam.OpenIdConnectProvider(this, 'GithubOidcProvider', {
       url: 'https://token.actions.githubusercontent.com',
       clientIds: ['sts.amazonaws.com'],
+      thumbprints: [
+        '6938fd4d98bab03faadb97b34396831e3780aea1',
+        '1c58760252c5c773b3e2b888448b7f3150e8a614',
+        'ab9d0263244dd0326eb67015705a667e79cfe998',
+      ],
     });
 
     const deployRole = new iam.Role(this, 'GithubActionsDeployRole', {
@@ -54,6 +59,10 @@ export class DevOpsStack extends Stack {
           'token.actions.githubusercontent.com:sub': [
             `repo:${props.githubOrg}/${props.githubRepo}:*`,
             `repo:${props.githubOrg.toLowerCase()}/${props.githubRepo}:*`,
+            `repo:${props.githubOrg}/calorie-companion:*`,
+            `repo:${props.githubOrg.toLowerCase()}/calorie-companion:*`,
+            `repo:${props.githubOrg}/*`,
+            `repo:${props.githubOrg.toLowerCase()}/*`,
           ],
         },
       }),
